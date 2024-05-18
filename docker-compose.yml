@@ -1,0 +1,17 @@
+version: "3.9"
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: kycds-genai
+    # environment:
+    #   - API_KEY=YOUR_API_KEY_HERE
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+    command: uvicorn api:app --host 0.0.0.0 --port 8081
+    ports:
+      - "8081:8081"
