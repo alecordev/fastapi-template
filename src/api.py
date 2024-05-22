@@ -4,19 +4,16 @@ import uuid
 import time
 import json
 import datetime
-import pathlib
 from contextlib import asynccontextmanager
 
 import uvicorn
 
 import fastapi
-from fastapi import HTTPException, Request, Security
+from fastapi import Request, Security
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
+from fastapi.responses import JSONResponse
 from fastapi.security.api_key import APIKey, APIKeyHeader
-from fastapi.templating import Jinja2Templates
-from fastapi.staticfiles import StaticFiles
 from starlette.status import (
     HTTP_200_OK,
     HTTP_404_NOT_FOUND,
@@ -33,7 +30,6 @@ import config
 import version
 
 api_key_header = APIKeyHeader(name=config.API_KEY_NAME)
-# templates = Jinja2Templates(directory=str(pathlib.Path(config.BASE_DIR, "templates")))
 
 
 @asynccontextmanager
@@ -96,20 +92,6 @@ async def add_context(request: Request, call_next):
     return response
 
 
-# @app.get("/assets/{filepath:path}")
-# async def get_file(filepath: str):
-#     file_location = (
-#         pathlib.Path(__file__).parent.resolve().absolute().joinpath("assets") / filepath
-#     )
-#     if file_location.exists():
-#         return FileResponse(str(file_location))
-#     else:
-#         return JSONResponse(
-#             status_code=HTTP_404_NOT_FOUND,
-#             content={"message": "File not found", "file": filepath},
-#         )
-
-
 @app.get("/health")
 def health():
     return JSONResponse(content={"status": "available"}, status_code=HTTP_200_OK)
@@ -130,7 +112,7 @@ async def ping(request: Request, api_key: APIKey = Security(api_key_header)):
     utils.log(f"Ping endpoint requested by {request.state.request_id}")
     message = {
         "id": request.state.request_id,
-        "timestamp": str(datetime.utcnow()),
+        "timestamp": str(utils.now()),
         "body": "Ping endpoint requested.",
         "metadata": {
             "request_id": str(request.state.request_id),
