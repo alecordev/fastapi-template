@@ -33,7 +33,14 @@ import config
 import version
 
 api_key_header = APIKeyHeader(name=config.API_KEY_NAME)
-templates = Jinja2Templates(directory=str(pathlib.Path(config.BASE_DIR, "templates")))
+# templates = Jinja2Templates(directory=str(pathlib.Path(config.BASE_DIR, "templates")))
+
+
+@asynccontextmanager
+async def lifespan(app: fastapi.FastAPI):
+    utils.log({"body": "API Service Started", "context": "startup_event"})
+    yield
+    utils.log({"body": "API Service Stopped", "context": "shutdown_event"})
 
 
 app = fastapi.FastAPI(
@@ -41,6 +48,7 @@ app = fastapi.FastAPI(
     version=config.API_VERSION,
     openapi_tags=docs.ENDPOINT_TAGS,
     description=docs.DESCRIPTION,
+    lifespan=lifespan,
 )
 
 app.add_middleware(GZipMiddleware, minimum_size=1000)
@@ -51,13 +59,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-
-@asynccontextmanager
-async def lifespan(app: fastapi.FastAPI):
-    utils.log({"body": "API Service Started", "context": "startup_event"})
-    yield
-    utils.log({"body": "API Service Stopped", "context": "shutdown_event"})
 
 
 @app.middleware("http")
@@ -95,18 +96,18 @@ async def add_context(request: Request, call_next):
     return response
 
 
-@app.get("/assets/{filepath:path}")
-async def get_file(filepath: str):
-    file_location = (
-        pathlib.Path(__file__).parent.resolve().absolute().joinpath("assets") / filepath
-    )
-    if file_location.exists():
-        return FileResponse(str(file_location))
-    else:
-        return JSONResponse(
-            status_code=HTTP_404_NOT_FOUND,
-            content={"message": "File not found", "file": filepath},
-        )
+# @app.get("/assets/{filepath:path}")
+# async def get_file(filepath: str):
+#     file_location = (
+#         pathlib.Path(__file__).parent.resolve().absolute().joinpath("assets") / filepath
+#     )
+#     if file_location.exists():
+#         return FileResponse(str(file_location))
+#     else:
+#         return JSONResponse(
+#             status_code=HTTP_404_NOT_FOUND,
+#             content={"message": "File not found", "file": filepath},
+#         )
 
 
 @app.get("/health")
@@ -192,7 +193,7 @@ async def ping(request: Request):
 
 
 app.mount("/api/v1", api_v1)
-app.mount("/static", StaticFiles(directory="static"), name="static")
+# app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
 if __name__ == "__main__":
