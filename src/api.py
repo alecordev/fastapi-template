@@ -154,7 +154,21 @@ api_v1.add_middleware(
     summary="Simple endpoint to view the environment variables currently set - will expose secrets",
 )
 async def environment(api_key: APIKey = Security(api_key_header)):
-    return os.environ
+    try:
+        return os.environ
+    except Exception as e:
+        error = utils.get_exception_details()
+        utils.log(error)
+        return JSONResponse(
+            status_code=HTTP_500_INTERNAL_SERVER_ERROR,
+            content={
+                "ERROR": {
+                    "error": "Request Failed",
+                    "detail": {"Error": error["message"].strip()},
+                    "debug": error,
+                }
+            },
+        )
 
 
 @api_v1.get("/ping", tags=["Healthchecks"], summary="Ping - Check if API is responding")
