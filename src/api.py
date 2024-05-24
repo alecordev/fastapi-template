@@ -9,13 +9,14 @@ from contextlib import asynccontextmanager
 import uvicorn
 
 import fastapi
-from fastapi import Request, Security
+from fastapi import Request, Response, HTTPException, Depends, Security, APIRouter
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.security.api_key import APIKey, APIKeyHeader
 from starlette.status import (
     HTTP_200_OK,
+    HTTP_403_FORBIDDEN,
     HTTP_404_NOT_FOUND,
     HTTP_422_UNPROCESSABLE_ENTITY,
     HTTP_500_INTERNAL_SERVER_ERROR,
@@ -39,12 +40,27 @@ async def lifespan(app: fastapi.FastAPI):
     utils.log({"body": "API Service Stopped", "context": "shutdown_event"})
 
 
+# async def verify_header(: str = Header()):
+#     if X-Web-Framework != "FastAPI":
+#          raise HTTPException(status_code=400, detail="Invalid Header")
+
+
+def validate_api_key(api_key_header: str = Security(api_key_header)):
+    if api_key_header == config.API_KEY:
+        return api_key_header
+    else:
+        raise HTTPException(
+            status_code=HTTP_403_FORBIDDEN, detail="Could not validate credentials"
+        )
+
+
 app = fastapi.FastAPI(
     title=config.API_TITLE,
     version=config.API_VERSION,
     openapi_tags=docs.ENDPOINT_TAGS,
     description=docs.DESCRIPTION,
     lifespan=lifespan,
+    dependencies=[Depends(validate_api_key)]  # Dependencies for all app routes
 )
 
 app.add_middleware(GZipMiddleware, minimum_size=1000)
@@ -72,7 +88,7 @@ async def add_context(request: Request, call_next):
 
     headers_to_log = {
         k: v for k, v in request.headers.items() if k.lower() != "x-api-key"
-    }
+    }  # Ignore some headers
 
     response = await call_next(request)
     process_time = time.time() - start_time
@@ -98,7 +114,7 @@ def health():
 
 
 @app.get("/ping", summary="Ping", tags=["ping"])
-async def ping(request: Request, api_key: APIKey = Security(api_key_header)):
+async def ping(request: Request, api_key: str = Depends(validate_api_key)):
     """
     Health check with API KEY
 
@@ -153,7 +169,7 @@ api_v1.add_middleware(
     include_in_schema=True,
     summary="Simple endpoint to view the environment variables currently set - will expose secrets",
 )
-async def environment(api_key: APIKey = Security(api_key_header)):
+async def environment(api_key: str = Depends(validate_api_key)):
     try:
         return os.environ
     except Exception as e:
@@ -187,6 +203,14 @@ async def ping(request: Request):
     utils.log(json.dumps(message, indent=4))
     return {"ping": "pong"}
 
+
+example_router = APIRouter()
+
+@example_router.get("/sub")
+async def read_sub():
+    return {"message": "Message response from sub router"}
+
+app.include_router(example_router, prefix="/example", tags=["Example"])
 
 app.mount("/api/v1", api_v1)
 # app.mount("/static", StaticFiles(directory="static"), name="static")
